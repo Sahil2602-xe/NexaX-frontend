@@ -6,7 +6,7 @@ export const getCoinList = (page)=>async(dispatch)=>{
 
     dispatch({type: FETCH_COIN_LIST_REQUEST})
 
-    const baseUrl = "http://localhost:5454"
+    const baseUrl = "https://nexax.up.railway.app"
 
     try{
         const {data} = await axios.get(`${baseUrl}/coins?page=${page}`);

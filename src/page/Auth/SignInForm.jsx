@@ -43,7 +43,7 @@ const SignInForm = () => {
       const user = await userRes.json()
 
       if (user.role === "ROLE_ADMIN") {
-        toast.success("Welcome Admin 👑")
+        toast.success("Welcome Admin ")
         navigate("/admin/withdrawals")
       } else {
         toast.success("Logged in successfully ")
