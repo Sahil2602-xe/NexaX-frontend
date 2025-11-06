@@ -37,7 +37,7 @@ const SignInForm = () => {
         return
       }
 
-      const userRes = await fetch("http://localhost:5454/api/users/profile", {
+      const userRes = await fetch("https://nexax.up.railway.app/api/users/profile", {
         headers: { Authorization: `Bearer ${jwt}` },
       })
       const user = await userRes.json()
