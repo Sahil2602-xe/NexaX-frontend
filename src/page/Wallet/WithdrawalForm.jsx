@@ -1,28 +1,56 @@
 import { Button } from '@/components/ui/button'
 import { DialogClose } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-import {  getPaymentDetails, withdrawalRequest } from '@/state/Withdrawal/Action'
-import React, { useEffect } from 'react'
+import { getPaymentDetails, withdrawalRequest } from '@/state/Withdrawal/Action'
+import React, { useEffect, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
+import { useToast } from '@/hooks/use-toast' // ✅ using same toast as TradingForm
 
 const WithdrawalForm = () => {
-  const [amount, setAmount] = React.useState('')
+  const [amount, setAmount] = useState('')
   const dispatch = useDispatch()
   const { wallet, withdrawal } = useSelector((store) => store)
+  const { toast } = useToast() // ✅ initialize toast
 
   const handleChange = (e) => {
     setAmount(e.target.value)
   }
 
   const handleSubmit = () => {
-    dispatch(withdrawalRequest({ amount, jwt: localStorage.getItem('jwt') }))
-    console.log(amount)
+    const withdrawAmount = parseFloat(amount)
+    const balance = wallet?.userWallet?.balance || 0
+
+    if (!withdrawAmount || withdrawAmount <= 0) {
+      toast({
+        title: "Invalid Amount",
+        description: "Please enter a valid withdrawal amount.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (withdrawAmount > balance) {
+      toast({
+        title: "Insufficient Balance",
+        description: "You don't have enough funds for this withdrawal.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    dispatch(withdrawalRequest({ amount: withdrawAmount, jwt: localStorage.getItem('jwt') }))
+
+    toast({
+      title: "Withdrawal Requested",
+      description: `Your withdrawal of $${withdrawAmount.toFixed(2)} has been submitted.`,
+    })
+
+    setAmount('') // ✅ reset field
   }
 
   useEffect(() => {
-  dispatch(getPaymentDetails({ jwt: localStorage.getItem("jwt") }));
-}, [dispatch]);
-
+    dispatch(getPaymentDetails({ jwt: localStorage.getItem("jwt") }))
+  }, [dispatch])
 
   const availableBalance = wallet?.userWallet?.balance || 0
 
