@@ -46,38 +46,75 @@ export const TradingForm = () => {
   }, []);
 
   const handleBuyCrypto = async () => {
-    try {
-      await dispatch(
-        payOrder({
-          jwt: localStorage.getItem("jwt"),
-          amount,
-          orderData: {
-            coinId: coin.coinDetails?.id,
-            quantity,
-            orderType,
-          },
-        })
-      );
+  try {
+    const currentPrice = coin.coinDetails?.market_data?.current_price?.usd || 0;
+    const totalCost = quantity * currentPrice;
+    const balance = wallet.userWallet?.balance || 0;
+    const availableQty = asset.assetDetails?.quantity || 0;
 
+    // 🧩 Basic validation
+    if (!amount || amount <= 0 || !quantity || quantity <= 0) {
       toast({
-        title: `${orderType} Successful`,
-        description:
-          orderType === "BUY"
-            ? `You bought ${quantity} ${coin.coinDetails?.symbol.toUpperCase()} successfully.`
-            : `You sold ${quantity} ${coin.coinDetails?.symbol.toUpperCase()} successfully.`,
-      });
-
-      setAmount(0);
-      setQuantity(0);
-    } catch (error) {
-      console.error(error);
-      toast({
-        title: `${orderType} Failed`,
-        description: "Something went wrong. Please try again.",
+        title: "Invalid Input",
+        description: "Please enter a valid amount or quantity.",
         variant: "destructive",
       });
+      return;
     }
-  };
+
+    // 💰 If buying → check balance
+    if (orderType === "BUY" && totalCost > balance) {
+      toast({
+        title: "Insufficient Balance",
+        description: "You don't have enough funds to complete this purchase.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // 📉 If selling → check quantity
+    if (orderType === "SELL" && quantity > availableQty) {
+      toast({
+        title: "Insufficient Quantity",
+        description: "You don't have enough coins to sell.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // ✅ Proceed only if all checks passed
+    await dispatch(
+      payOrder({
+        jwt: localStorage.getItem("jwt"),
+        amount,
+        orderData: {
+          coinId: coin.coinDetails?.id,
+          quantity,
+          orderType,
+        },
+      })
+    );
+
+    toast({
+      title: `${orderType} Successful`,
+      description:
+        orderType === "BUY"
+          ? `You bought ${quantity} ${coin.coinDetails?.symbol.toUpperCase()} successfully.`
+          : `You sold ${quantity} ${coin.coinDetails?.symbol.toUpperCase()} successfully.`,
+    });
+
+    setAmount(0);
+    setQuantity(0);
+  } catch (error) {
+    console.error(error);
+    toast({
+      title: `${orderType} Failed`,
+      description: "Something went wrong. Please try again.",
+      variant: "destructive",
+    });
+  }
+};
+
 
   return (
     <div className="space-y-10 p-5">
