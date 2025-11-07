@@ -50,21 +50,26 @@ export const Wallet = () => {
     handleFetchWalletTransaction()
   }, [])
 
-  useEffect(() => {
-    const finalPaymentId =
-      razorpayPaymentId || paymentId || stripeSessionId
+  const depositProcessed = React.useRef(false);
 
-    if (orderId && finalPaymentId) {
-      dispatch(
-        depositMoney({
-          jwt: localStorage.getItem('jwt'),
-          orderId,
-          paymentId: finalPaymentId,
-          navigate,
-        })
-      )
-    }
-  }, [orderId, paymentId, razorpayPaymentId, stripeSessionId])
+
+  useEffect(() => {
+  const finalPaymentId =
+    razorpayPaymentId || paymentId || stripeSessionId;
+
+  if (orderId && finalPaymentId && !depositProcessed.current) {
+    depositProcessed.current = true; // prevent duplicate deposit
+    dispatch(
+      depositMoney({
+        jwt: localStorage.getItem('jwt'),
+        orderId,
+        paymentId: finalPaymentId,
+        navigate,
+      })
+    )
+  }
+}, [orderId, paymentId, razorpayPaymentId, stripeSessionId])
+
 
   const handleFetchUserWallet = () => {
     dispatch(getUserWallet(localStorage.getItem('jwt')))
