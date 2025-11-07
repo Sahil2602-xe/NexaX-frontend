@@ -22,8 +22,12 @@ function App() {
   const dispatch = useDispatch();
 
   useEffect(() => {
-    dispatch(getUser(auth.jwt || localStorage.getItem("jwt")));
-  }, [auth.jwt]);
+  const jwt = auth.jwt || localStorage.getItem("jwt");
+  if (jwt) {
+    dispatch(getUser(jwt));
+  }
+}, [auth.jwt]);
+
 
   const isAdmin = auth?.user?.role === "ROLE_ADMIN";
 
