@@ -30,6 +30,7 @@ import {
   getWalletTransactions,
 } from '@/state/Wallet/Action'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { useToast } from '@/hooks/use-toast'
 
 function useQuery() {
   return new URLSearchParams(useLocation().search)
@@ -44,32 +45,52 @@ export const Wallet = () => {
   const razorpayPaymentId = query.get('razorpay_payment_id')
   const stripeSessionId = query.get('session_id')
   const navigate = useNavigate()
+  const { toast } = useToast()
 
+  // ✅ Main effect to handle payment success and wallet refresh
   useEffect(() => {
-    handleFetchUserWallet()
-    handleFetchWalletTransaction()
-  }, [])
+    const handlePaymentUpdate = async () => {
+      const finalPaymentId =
+        razorpayPaymentId || paymentId || stripeSessionId
 
-  const depositProcessed = React.useRef(false);
+      // 🟢 Handle payment confirmation (deposit)
+      if (orderId && finalPaymentId) {
+        try {
+          await dispatch(
+            depositMoney({
+              jwt: localStorage.getItem('jwt'),
+              orderId,
+              paymentId: finalPaymentId,
+              navigate,
+            })
+          )
 
+          // ✅ Success toast
+          toast({
+            title: "Payment Successful 💸",
+            description: "Your wallet has been updated successfully!",
+          })
 
-  useEffect(() => {
-  const finalPaymentId =
-    razorpayPaymentId || paymentId || stripeSessionId;
+          // Refresh wallet + transactions
+          await dispatch(getUserWallet(localStorage.getItem('jwt')))
+          await dispatch(getWalletTransactions({ jwt: localStorage.getItem('jwt') }))
+        } catch (error) {
+          console.error(error)
+          toast({
+            title: "Payment Update Failed",
+            description: "Could not refresh wallet. Please try again.",
+            variant: "destructive",
+          })
+        }
+      } else {
+        // 🟢 Normal wallet load
+        await dispatch(getUserWallet(localStorage.getItem('jwt')))
+        await dispatch(getWalletTransactions({ jwt: localStorage.getItem('jwt') }))
+      }
+    }
 
-  if (orderId && finalPaymentId && !depositProcessed.current) {
-    depositProcessed.current = true; // prevent duplicate deposit
-    dispatch(
-      depositMoney({
-        jwt: localStorage.getItem('jwt'),
-        orderId,
-        paymentId: finalPaymentId,
-        navigate,
-      })
-    )
-  }
-}, [orderId, paymentId, razorpayPaymentId, stripeSessionId])
-
+    handlePaymentUpdate()
+  }, [orderId, paymentId, razorpayPaymentId, stripeSessionId])
 
   const handleFetchUserWallet = () => {
     dispatch(getUserWallet(localStorage.getItem('jwt')))
@@ -77,6 +98,17 @@ export const Wallet = () => {
 
   const handleFetchWalletTransaction = () => {
     dispatch(getWalletTransactions({ jwt: localStorage.getItem('jwt') }))
+  }
+
+  const availableBalance = wallet.userWallet?.balance?.toFixed(2) || '0.00'
+
+  // ✅ Safety fallback
+  if (!wallet.userWallet) {
+    return (
+      <div className="text-center text-gray-400 mt-20 text-lg">
+        Loading Wallet...
+      </div>
+    )
   }
 
   return (
@@ -114,11 +146,12 @@ export const Wallet = () => {
             <div className="flex items-center gap-2 mt-3">
               <DollarSignIcon className="text-emerald-400" />
               <span className="text-3xl font-semibold text-white">
-                ${wallet.userWallet?.balance?.toFixed(2) || '0.00'}
+                ${availableBalance}
               </span>
             </div>
 
             <div className="flex gap-7 mt-8">
+              {/* Top Up Dialog */}
               <Dialog>
                 <DialogTrigger>
                   <div className="h-24 w-24 text-gray-300 hover:text-gray-100 hover:bg-[#1b1f27] flex flex-col items-center justify-center rounded-xl border border-gray-800 shadow-md transition-all">
@@ -134,6 +167,7 @@ export const Wallet = () => {
                 </DialogContent>
               </Dialog>
 
+              {/* Withdraw Dialog */}
               <Dialog>
                 <DialogTrigger>
                   <div className="h-24 w-24 text-gray-300 hover:text-gray-100 hover:bg-[#1b1f27] flex flex-col items-center justify-center rounded-xl border border-gray-800 shadow-md transition-all">
@@ -149,6 +183,7 @@ export const Wallet = () => {
                 </DialogContent>
               </Dialog>
 
+              {/* Transfer Dialog */}
               <Dialog>
                 <DialogTrigger>
                   <div className="h-24 w-24 text-gray-300 hover:text-gray-100 hover:bg-[#1b1f27] flex flex-col items-center justify-center rounded-xl border border-gray-800 shadow-md transition-all">
@@ -169,6 +204,7 @@ export const Wallet = () => {
           </CardContent>
         </Card>
 
+        {/* Transaction History */}
         <div className="py-5 pt-10">
           <div className="flex gap-3 items-center pb-5">
             <h1 className="text-2xl font-semibold text-white">History</h1>
