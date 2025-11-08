@@ -18,7 +18,7 @@ import {
   UploadIcon,
   WalletIcon,
 } from 'lucide-react'
-import React, { useEffect } from 'react'
+import React, { useEffect, useRef } from 'react'
 import TopUpForm from './TopUpForm'
 import WithdrawalForm from './WithdrawalForm'
 import TransferForm from './TransferForm'
@@ -46,15 +46,18 @@ export const Wallet = () => {
   const stripeSessionId = query.get('session_id')
   const navigate = useNavigate()
   const { toast } = useToast()
+  const paymentProcessedRef = useRef(false) // ✅ Prevent duplicate processing
 
-  // ✅ Main effect to handle payment success and wallet refresh
+  // ✅ Effect 1: Handle payment confirmation (runs only once per payment)
   useEffect(() => {
     const handlePaymentUpdate = async () => {
       const finalPaymentId =
         razorpayPaymentId || paymentId || stripeSessionId
 
       // 🟢 Handle payment confirmation (deposit)
-      if (orderId && finalPaymentId) {
+      if (orderId && finalPaymentId && !paymentProcessedRef.current) {
+        paymentProcessedRef.current = true // ✅ Mark as processed
+
         try {
           await dispatch(
             depositMoney({
@@ -74,23 +77,33 @@ export const Wallet = () => {
           // Refresh wallet + transactions
           await dispatch(getUserWallet(localStorage.getItem('jwt')))
           await dispatch(getWalletTransactions({ jwt: localStorage.getItem('jwt') }))
+          
+          // ✅ Clean up URL after successful payment
+          window.history.replaceState({}, document.title, '/wallet')
         } catch (error) {
-          console.error(error)
+          console.error('Payment processing error:', error)
           toast({
             title: "Payment Update Failed",
             description: "Could not refresh wallet. Please try again.",
             variant: "destructive",
           })
+          paymentProcessedRef.current = false // ✅ Allow retry on error
         }
-      } else {
-        // 🟢 Normal wallet load
-        await dispatch(getUserWallet(localStorage.getItem('jwt')))
-        await dispatch(getWalletTransactions({ jwt: localStorage.getItem('jwt') }))
       }
     }
 
     handlePaymentUpdate()
-  }, [orderId, paymentId, razorpayPaymentId, stripeSessionId])
+  }, [orderId, paymentId, razorpayPaymentId, stripeSessionId, dispatch, toast])
+
+  // ✅ Effect 2: Load wallet data on component mount (or when payment params cleared)
+  useEffect(() => {
+    const jwt = localStorage.getItem('jwt')
+    if (jwt && !orderId) {
+      // Only load if no active payment processing
+      dispatch(getUserWallet(jwt))
+      dispatch(getWalletTransactions({ jwt }))
+    }
+  }, [])
 
   const handleFetchUserWallet = () => {
     dispatch(getUserWallet(localStorage.getItem('jwt')))
@@ -102,11 +115,17 @@ export const Wallet = () => {
 
   const availableBalance = wallet.userWallet?.balance?.toFixed(2) || '0.00'
 
-  // ✅ Safety fallback
+  // ✅ Safety fallback with timeout
   if (!wallet.userWallet) {
     return (
       <div className="text-center text-gray-400 mt-20 text-lg">
-        Loading Wallet...
+        <p>Loading Wallet...</p>
+        <button
+          onClick={handleFetchUserWallet}
+          className="mt-4 px-4 py-2 bg-emerald-600 text-white rounded hover:bg-emerald-700"
+        >
+          Retry Load
+        </button>
       </div>
     )
   }
