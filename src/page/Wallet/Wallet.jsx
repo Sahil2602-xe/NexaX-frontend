@@ -29,21 +29,13 @@ import {
   getUserWallet,
   getWalletTransactions,
 } from '@/state/Wallet/Action'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { useToast } from '@/hooks/use-toast'
 
-function useQuery() {
-  return new URLSearchParams(useLocation().search)
-}
 
 export const Wallet = () => {
   const dispatch = useDispatch()
   const { wallet } = useSelector((store) => store)
-  const query = useQuery()
-  const orderId = query.get('order_id')
-  const paymentId = query.get('payment_id')
-  const razorpayPaymentId = query.get('razorpay_payment_id')
-  const stripeSessionId = query.get('session_id')
   const navigate = useNavigate()
   const { toast } = useToast()
   const paymentProcessedRef = useRef(false) // ✅ Prevent duplicate processing
@@ -51,10 +43,14 @@ export const Wallet = () => {
   // ✅ Effect 1: Handle payment confirmation (runs only once per payment)
   useEffect(() => {
     const handlePaymentUpdate = async () => {
-      const finalPaymentId =
-        razorpayPaymentId || paymentId || stripeSessionId
+      // ✅ Fetch params directly from URL to avoid router delay
+      const params = new URLSearchParams(window.location.search)
+      const orderId = params.get('order_id')
+      const paymentId = params.get('payment_id')
+      const razorpayPaymentId = params.get('razorpay_payment_id')
+      const stripeSessionId = params.get('session_id')
+      const finalPaymentId = razorpayPaymentId || paymentId || stripeSessionId
 
-      // 🟢 Handle payment confirmation (deposit)
       if (orderId && finalPaymentId && !paymentProcessedRef.current) {
         paymentProcessedRef.current = true // ✅ Mark as processed
 
@@ -68,16 +64,14 @@ export const Wallet = () => {
             })
           )
 
-          // ✅ Success toast
           toast({
             title: "Payment Successful 💸",
             description: "Your wallet has been updated successfully!",
           })
 
-          // Refresh wallet + transactions
           await dispatch(getUserWallet(localStorage.getItem('jwt')))
           await dispatch(getWalletTransactions({ jwt: localStorage.getItem('jwt') }))
-          
+
           // ✅ Clean up URL after successful payment
           window.history.replaceState({}, document.title, '/wallet')
         } catch (error) {
@@ -87,23 +81,25 @@ export const Wallet = () => {
             description: "Could not refresh wallet. Please try again.",
             variant: "destructive",
           })
-          paymentProcessedRef.current = false // ✅ Allow retry on error
+          paymentProcessedRef.current = false
         }
       }
     }
 
-    handlePaymentUpdate()
-  }, [orderId, paymentId, razorpayPaymentId, stripeSessionId, dispatch, toast])
+    // ✅ Small delay ensures router finished parsing URL
+    setTimeout(() => handlePaymentUpdate(), 500)
+  }, [dispatch, toast, navigate])
 
   // ✅ Effect 2: Load wallet data on component mount (or when payment params cleared)
   useEffect(() => {
     const jwt = localStorage.getItem('jwt')
-    if (jwt && !orderId) {
-      // Only load if no active payment processing
+    const params = new URLSearchParams(window.location.search)
+    const hasOrder = params.get('order_id')
+    if (jwt && !hasOrder) {
       dispatch(getUserWallet(jwt))
       dispatch(getWalletTransactions({ jwt }))
     }
-  }, [])
+  }, [dispatch])
 
   const handleFetchUserWallet = () => {
     dispatch(getUserWallet(localStorage.getItem('jwt')))
@@ -115,7 +111,6 @@ export const Wallet = () => {
 
   const availableBalance = wallet.userWallet?.balance?.toFixed(2) || '0.00'
 
-  // ✅ Safety fallback with timeout
   if (!wallet.userWallet) {
     return (
       <div className="text-center text-gray-400 mt-20 text-lg">
