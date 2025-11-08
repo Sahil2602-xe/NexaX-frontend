@@ -49,9 +49,13 @@ export const Wallet = () => {
       const paymentId = params.get('payment_id')
       const razorpayPaymentId = params.get('razorpay_payment_id')
       const stripeSessionId = params.get('session_id')
-      const finalPaymentId = razorpayPaymentId || paymentId || stripeSessionId
+      const razorpayPaymentLinkId = params.get('razorpay_payment_link_id')
 
-      if (orderId && finalPaymentId && !paymentProcessedRef.current) {
+// ✅ Use link ID if payment ID missing
+const finalPaymentId = razorpayPaymentId || paymentId || stripeSessionId || razorpayPaymentLinkId
+
+
+      if (orderId && !paymentProcessedRef.current) {
         paymentProcessedRef.current = true // ✅ Mark as processed
 
         try {
